@@ -126,10 +126,10 @@ public class PreCalcServlet extends HttpServlet {
 
 	// Metric 3: ForumActivity: number of contributions to the forum
 	// Unit: -
-	// Calculation:
+	// Calculation: summing up forum contribution based on each user's posts 
 	// Tables used: "forum_interaction" with the fields:
     //		"course_run_id" - to identify the course
-    // 		"learner_id" - to identify sessions belonging to the current user
+    // 		"learner_id" - to identify the current user
     // 		"post_id" - to calculate the number of user's forum posts
 
 	private int getForumActivity(Connection edXConnection, String courseId, String userId) throws SQLException{
@@ -149,11 +149,25 @@ public class PreCalcServlet extends HttpServlet {
 
 	// Metric 4: QuizAttempted: number of unique quiz questions that were attempted by a learner
 	// Unit: -
-	// Calculation:
-	// Tables used:
+	// Calculation: summing the number of unique quiz attempts by a learner 
+	// Tables used: "submissions" with the fields of:
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify the current user
+	// 		"submission_id" - to calculate the number of user's quiz attempts
 
-	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) {
-		return 0;
+	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) throws SQLException {
+		String query = "SELECT COUNT (DISTINCT submission_id) AS quiz_count FROM submissions "
+					+ "WHERE learner_id='" + userId + "' AND course_run_id='" + courseId + "';"; 
+		
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		int quiz_attempts = 0;
+		
+		if (rs.next())
+			quiz_attempts += rs.getInt("quiz_count");
+				
+		return quiz_attempts;
 	}
 
 	// Metric 5: ProportionTimeOnQuiz: the proportion of time spent on quiz pages from the total time spent on the platform
