@@ -26,7 +26,8 @@ public class PreCalcServlet extends HttpServlet {
 
 			//1. Extract parameters from the HTTP Request
 			String anonId = request.getParameter("anonId").toString();
-	        int week = Integer.parseInt(request.getParameter("week"));
+			String courseId = request.getParameter("course");
+			//todo: add the course_id as a parameter in the script
 
 			//2. Connect to the edX database
 			DatabaseData edXDatabase = new DatabaseData("com.mysql.jdbc.Driver", "...", "...", "..."); //TODO: update
@@ -37,15 +38,18 @@ public class PreCalcServlet extends HttpServlet {
 			Connection localConnection = connectToDatabase(localDatabase);
 
 			//3. Get the short user ID instead of the anonymous ID
-			userId = getUserId(edXConnection, anonId);		//todo: based on the database structure, this might be changed
+			userId = getUserId(edXConnection, anonId);
+			//todo: based on the database structure, this might be changed
+			//todo: check if it is possible to get it from the database - otherwise we need to send HTTP requests directly with the short user id (get it through "analytics" and not through %%USER_ID%%
+
 
 			//4. Calculate metrics for the current user in the requested week
-			int avgTimePerWeek = getAverageTimePerWeek(edXConnection, userId, week);
-			int lecturesRevisited = getLecturesRevisited(edXConnection, userId, week);
-			int forumActivity = getForumActivity(edXConnection, userId, week);
-			int quizAttempted = getQuizAttempted(edXConnection, userId, week);
-			int proportionTimeOnQuiz = getProportionTimeOnQuiz(edXConnection, userId, week);
-			int timeliness = getTimeliness(edXConnection, userId, week);
+			int avgTimePerWeek = getAverageTimePerWeek(edXConnection, courseId, userId);
+			int lecturesRevisited = getLecturesRevisited(edXConnection, courseId, userId);
+			int forumActivity = getForumActivity(edXConnection, courseId, userId);
+			int quizAttempted = getQuizAttempted(edXConnection, courseId, userId);
+			int proportionTimeOnQuiz = getProportionTimeOnQuiz(edXConnection, courseId, userId);
+			int timeliness = getTimeliness(edXConnection, courseId, userId);
 
 			//todo: concatenate the values into the "individual" variable to integrate it in the script
 			individual = "";
@@ -68,7 +72,7 @@ public class PreCalcServlet extends HttpServlet {
 			//todo
 
 			//7. Generate the Learning Tracker script
-	   		reply = generateScript(week, userId, individual, individualScaled, referenceFrameThisWeek, referenceFrameThisWeekScaled, referenceFrameNextWeek, referenceFrameNextWeekScaled);
+	   		reply = generateScript(userId, individual, individualScaled, referenceFrameThisWeek, referenceFrameThisWeekScaled, referenceFrameNextWeek, referenceFrameNextWeekScaled);
 			//todo: customize the script based on the treatment group in which the learners are
 
  			//8. Respond to the request with the generated script
@@ -91,23 +95,23 @@ public class PreCalcServlet extends HttpServlet {
 	// Unit: minutes
 	// Calculation: summing up the duration of each session that happened before the current week
 	// Tables used: "sessions" with the fields:
-	// 		"course_user_id" - to identify sessions belonging to the current user
-	// 		"start_time" - to identify sessions performed until the requested week
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify sessions belonging to the current user
 	// 		"duration" - to calculate the time spent per week
 
-   private int getAverageTimePerWeek(Connection conn, String userId, int week) throws SQLException {
-	   String current_week_end_time = getCurrentWeekEndTime(week);
-	   String query = "SELECT * FROM sessions WHERE course_user_id='" + userId + "' AND start_time < '" + current_week_end_time + "';";		//todo: check the format of start_time in the database and if it can be compared to the week
+   private int getAverageTimePerWeek(Connection conn, String courseId, String userId) throws SQLException {
+	   String query = "SELECT SUM(duration) AS duration FROM sessions WHERE course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
 
 	   Statement st = conn.createStatement();
 	   ResultSet res = st.executeQuery(query);
 
+	   int week = 1; 	//todo: identify the number of weeks since the start of the course
 	   int total_duration = 0;	//this fields is in seconds in the database
 
 	   if (res.next())
-		   total_duration += res.getInt("duration");
+		   total_duration = res.getInt("duration");
 
-	   return (total_duration/60)/week;
+	   return (total_duration/60)/week;			//division by 60 to transform into minutes
 
    }
 
@@ -116,7 +120,7 @@ public class PreCalcServlet extends HttpServlet {
 	// Calculation:
 	// Tables used:
 
-	private int getLecturesRevisited(Connection edXConnection, String userId, int week) {
+	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) {
 		return 0;
 	}
 
@@ -125,7 +129,7 @@ public class PreCalcServlet extends HttpServlet {
 	// Calculation:
 	// Tables used:
 
-	private int getForumActivity(Connection edXConnection, String userId, int week) {
+	private int getForumActivity(Connection edXConnection, String courseId, String userId) {
 		return 0;
 	}
 
@@ -134,7 +138,7 @@ public class PreCalcServlet extends HttpServlet {
 	// Calculation:
 	// Tables used:
 
-	private int getQuizAttempted(Connection edXConnection, String userId, int week) {
+	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) {
 		return 0;
 	}
 
@@ -143,7 +147,7 @@ public class PreCalcServlet extends HttpServlet {
 	// Calculation:
 	// Tables used:
 
-	private int getProportionTimeOnQuiz(Connection edXConnection, String userId, int week) {
+	private int getProportionTimeOnQuiz(Connection edXConnection, String courseId, String userId) {
 		return 0;
 	}
 
@@ -152,7 +156,7 @@ public class PreCalcServlet extends HttpServlet {
 	// Calculation:
 	// Tables used:
 
-	private int getTimeliness(Connection edXConnection, String userId, int week) {
+	private int getTimeliness(Connection edXConnection, String courseId, String userId) {
 		return 0;
 	}
 
@@ -183,18 +187,11 @@ public class PreCalcServlet extends HttpServlet {
 		return userId;
 	}
 
-	private String getCurrentWeekEndTime(int week) {	//todo
-		//calculate the end time of the current week based on the start time of the course
-		//it is used in order to filter out data requested from the database eg. even though the course is in week 5, the widget in week 3 should show only data until the end of week 3
-
-		return "";
-	}
-
 	//===============================
     //====== Script generation ======
 	//===============================
 
-   private String generateScript(int week, String user_id, String values, String scaled_values, String last_week, String scaled_last_week, String this_week, String scaled_this_week) {
+   private String generateScript(String user_id, String values, String scaled_values, String last_week, String scaled_last_week, String this_week, String scaled_this_week) {
 
 		String reply = "";
 
