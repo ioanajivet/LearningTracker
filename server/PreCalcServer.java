@@ -118,8 +118,8 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 2: LecturesRevisited: number of videos that have been visited more than once and viewed more than 80% of their total duration
 	// Unit: -
 	// Calculation:
-	// Tables used:
-
+   // Tables used: 
+	
 	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) {
 		return 0;
 	}
@@ -127,10 +127,24 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 3: ForumActivity: number of contributions to the forum
 	// Unit: -
 	// Calculation:
-	// Tables used:
+	// Tables used: "forum_interaction" with the fields:
+    //		"course_run_id" - to identify the course
+    // 		"learner_id" - to identify sessions belonging to the current user
+    // 		"post_id" - to calculate the number of user's forum posts
 
-	private int getForumActivity(Connection edXConnection, String courseId, String userId) {
-		return 0;
+	private int getForumActivity(Connection edXConnection, String courseId, String userId) throws SQLException{
+		String query = "SELECT COUNT(post_id) AS post_count FROM forum_interaction WHERE course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
+				
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		int forum_contribution = 0;
+		
+		if (rs.next()){
+			forum_contribution += rs.getInt("post_count");
+		}
+
+		return forum_contribution;
 	}
 
 	// Metric 4: QuizAttempted: number of unique quiz questions that were attempted by a learner
