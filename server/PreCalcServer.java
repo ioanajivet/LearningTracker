@@ -156,7 +156,7 @@ public class PreCalcServlet extends HttpServlet {
 	// 		"submission_id" - to calculate the number of user's quiz attempts
 
 	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) throws SQLException {
-		String query = "SELECT COUNT (DISTINCT submission_id) AS quiz_count FROM submissions "
+		String query = "SELECT COUNT(DISTINCT submission_id) AS quiz_count FROM submissions "
 					+ "WHERE learner_id='" + userId + "' AND course_run_id='" + courseId + "';"; 
 		
 		Statement stmt = edXConnection.createStatement();
@@ -173,10 +173,37 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 5: ProportionTimeOnQuiz: the proportion of time spent on quiz pages from the total time spent on the platform
 	// Unit: -
 	// Calculation:
-	// Tables used:
-
+	// Tables used: "sessions" & "quiz_sessions". By which the "sessions" used fields are:
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify sessions belonging to the current user
+	// 		"duration" - to calculate the general time spent on platform
+	//		*and the "quiz_sessions" used fields are:
+	//		"duration" - to calculate the time spent on quiz
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify the current user
+	
 	private int getProportionTimeOnQuiz(Connection edXConnection, String courseId, String userId) {
-		return 0;
+		   String query_duration = "SELECT SUM(duration) AS total_time_duration FROM sessions WHERE course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
+		   String query_time_on_quiz = "SELECT SUM(duration) AS quiz_duration FROM quiz_sessions Where course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
+		   		   
+		   Statement stmt = edXConnection.createStatement();
+		   ResultSet rs;
+		   
+		   rs = stmt.executeQuery(query_duration);
+
+		   int total_duration = 0;	//this fields is in seconds in the database
+		  		   
+		   if (rs.next())
+			   total_duration = rs.getInt("total_time_duration");
+		   		   
+		   rs = stmt.executeQuery(query_time_on_quiz);
+		   
+		   int quiz_duration = 0;  //in seconds
+		   
+		   if (rs.next())
+			   quiz_duration = rs.getInt("quiz_duration");
+		   
+		   return quiz_duration * 100 / total_duration;
 	}
 
 	// Metric 6: Timeliness: how early before the deadline learners submit their quiz question answers
