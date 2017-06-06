@@ -86,7 +86,6 @@ public class PreCalcServlet extends HttpServlet {
        }
    }
 
-
 	//=========================================
 	//====== Metric computation methods =======
 	//=========================================
@@ -141,7 +140,7 @@ public class PreCalcServlet extends HttpServlet {
 		int forum_contribution = 0;
 		
 		if (rs.next()){
-			forum_contribution += rs.getInt("post_count");
+			forum_contribution = rs.getInt("post_count");
 		}
 
 		return forum_contribution;
@@ -153,10 +152,10 @@ public class PreCalcServlet extends HttpServlet {
 	// Tables used: "submissions" with the fields of:
 	//		"course_run_id" - to identify the course
 	// 		"learner_id" - to identify the current user
-	// 		"submission_id" - to calculate the number of user's quiz attempts
+	// 		"question_id" - to calculate the number of user's quiz attempts
 
 	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) throws SQLException {
-		String query = "SELECT COUNT(DISTINCT submission_id) AS quiz_count FROM submissions "
+		String query = "SELECT COUNT(DISTINCT question_id) AS quiz_count FROM submissions "
 					+ "WHERE learner_id='" + userId + "' AND course_run_id='" + courseId + "';"; 
 		
 		Statement stmt = edXConnection.createStatement();
@@ -177,12 +176,12 @@ public class PreCalcServlet extends HttpServlet {
 	//		"course_run_id" - to identify the course
 	// 		"learner_id" - to identify sessions belonging to the current user
 	// 		"duration" - to calculate the general time spent on platform
-	//		*and the "quiz_sessions" used fields are:
+	//		*and the "quiz_sessions" table used fields are:
 	//		"duration" - to calculate the time spent on quiz
 	//		"course_run_id" - to identify the course
 	// 		"learner_id" - to identify the current user
 	
-	private int getProportionTimeOnQuiz(Connection edXConnection, String courseId, String userId) {
+	private int getProportionTimeOnQuiz(Connection edXConnection, String courseId, String userId) throws SQLException {
 		   String query_duration = "SELECT SUM(duration) AS total_time_duration FROM sessions WHERE course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
 		   String query_time_on_quiz = "SELECT SUM(duration) AS quiz_duration FROM quiz_sessions Where course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
 		   		   
@@ -209,10 +208,35 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 6: Timeliness: how early before the deadline learners submit their quiz question answers
 	// Unit: hours
 	// Calculation:
-	// Tables used:
-
-	private int getTimeliness(Connection edXConnection, String courseId, String userId) {
-		return 0;
+	// Tables used: "submissions" & ""quiz_questions". By which the "submission" used fields are:
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify the current user
+	//		"question_id" - to identify the current question
+	//		"submission_timestamp" - to identify the user's quiz submission date 
+	//		*and the "quiz_questions" table used fields are:
+	//		"question_due" - to identify the quiz question due date
+	//		"question_id" - to identify the current question
+	
+	private int getTimeliness(Connection edXConnection, String courseId, String userId) throws SQLException{
+		String query = "SELECT COUNT(*) AS countLines"
+				+ ", AVG(TIME_TO_SEC(TIMEDIFF(submissions.submission_timestamp, quiz_questions.question_due)) / 3600) AS timeliness_average"
+				+ " FROM submissions"
+				+ " INNER JOIN"
+				+ " quiz_questions ON submissions.question_id = quiz_questions.question_id where"
+				+ "submission.learner_id = '" + userId + "' AND submissions.course_run_id= '" + courseId + "';";
+	
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		double timeliness_average = 0;  //in hours
+		 
+		if (rs.next()) {
+			timeliness_average += rs.getInt("timeliness_average");
+			return timeliness_average;
+		} while(rs.next());
+		else
+			return 0;		// in case rs == null
+		}
 	}
 
 	//===============================
