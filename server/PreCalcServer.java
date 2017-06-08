@@ -117,10 +117,33 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 2: LecturesRevisited: number of videos that have been visited more than once and viewed more than 80% of their total duration
 	// Unit: -
 	// Calculation:
-   // Tables used: 
+   //  Tables used: "video_interaction" & "video_additional". By which the "video_interaction" used fields are:
+   //		"course_run_id" - to identify the course
+   // 		"learner_id" - to identify the current user
+   // 		"video_id" - to identify the video
+   //		"duration" - to examine if a user wathces more than or equal 80% of the total video duration
+   //	*and the "video_additional" table used fields are:
+   // 		"video_id" - to identify the video
+   // 		"length" - to calcualte if a user watches more than 80%
 	
-	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) {
-		return 0;
+	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) throws SQLException{
+		String query ="SELECT A.video_id, COUNT(I.video_id) AS video_count "
+				+ "FROM video_interaction I"
+				+ " INNER JOIN video_additional A ON A.video_id = I.video_id"
+				+ " AND I.duration / A.length >= 0.80"
+				+ " WHERE I.course_run_id='" + courseId + "' AND I.learner_id='" + userId +  "'"
+				+ "GROUP BY A.video_id HAVING COUNT(I.video_id) >= 2";
+						
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		int revisited = 0;
+		
+		if (rs.next()){
+			revisited = rs.getInt("video_count");
+		}
+		
+		return revisited;
 	}
 
 	// Metric 3: ForumActivity: number of contributions to the forum
