@@ -128,11 +128,11 @@ public class PreCalcServlet extends HttpServlet {
 	
 	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) throws SQLException{
 		String query ="SELECT A.video_id, COUNT(I.video_id) AS video_count "
-				+ "FROM video_interaction I"
-				+ " INNER JOIN video_additional A ON A.video_id = I.video_id"
+				+ "FROM edXDatabase.video_interaction I"
+				+ " INNER JOIN localDatabase.video_additional A ON A.video_id = I.video_id"
 				+ " AND I.duration / A.length >= 0.80"
 				+ " WHERE I.course_run_id='" + courseId + "' AND I.learner_id='" + userId +  "'"
-				+ "GROUP BY A.video_id HAVING COUNT(I.video_id) >= 2";
+				+ "GROUP BY A.video_id HAVING COUNT(I.video_id) >= 2";		// the query connects two databases. //todo: check if it runs correctly.
 						
 		Statement stmt = edXConnection.createStatement();
 		ResultSet rs = stmt.executeQuery(query);
