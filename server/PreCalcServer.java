@@ -8,74 +8,62 @@ import java.sql.*;
 
 public class PreCalcServlet extends HttpServlet {
 
+	private DatabaseData edXDatabase = new DatabaseData("com.mysql.jdbc.Driver", "...", "...", "..."); //TODO: update
+	private DatabaseData localDatabase = new DatabaseData("com.mysql.jdbc.Driver", "jdbc:mysql://localhost:3306/learning_tracker", "root", ""); //TODO: updat
+	private Connection edXConnection = null;
+	private Connection localConnection = null;
+
+	private int course_weeks; 	//todo: define the number of weeks in the course
+
    @Override
    public void doGet(HttpServletRequest request, HttpServletResponse response) 
-		throws IOException, ServletException {
+		throws IOException, ServletException, SQLException {
 
 	   PrintWriter writer = response.getWriter();
 		String reply = "empty reply";
-		String userId = "",
-			individual = "",
-			individualScaled = "",
-			referenceFrameThisWeek = "",
-			referenceFrameThisWeekScaled = "",
-			referenceFrameNextWeek = "",
-			referenceFrameNextWeekScaled = "";
+		String userId = "";
+	   double[] individual, referenceFrameThisWeek, referenceFrameNextWeek, maximumsThisWeek, maximumsNextWeek;
 
-        try{
+	   Connection edXConnection = null;
+	   Connection localConnection = null;
+
+	   try{
 
 			//1. Extract parameters from the HTTP Request
-			String anonId = request.getParameter("anonId").toString();
-			String courseId = request.getParameter("course");
+			String anonId = request.getParameter("userId").toString();
+			String courseId = request.getParameter("courseId");
 			//todo: add the course_id as a parameter in the script
 
-			//2. Connect to the edX database
-			DatabaseData edXDatabase = new DatabaseData("com.mysql.jdbc.Driver", "...", "...", "..."); //TODO: update
-		    Connection edXConnection = connectToDatabase(edXDatabase);
+			//2. Calculate the current week - needed for calculating averages per week and retrieving the reference frames
+			int week = 1; //todo: calculate the current week based on a timestamp
 
-			//3. Connect to the local database
-			DatabaseData localDatabase = new DatabaseData("com.mysql.jdbc.Driver", "jdbc:mysql://localhost:3306/learning_tracker", "root", ""); //TODO: update
-			Connection localConnection = connectToDatabase(localDatabase);
+			//3. Connect to the edX database and to the local database
+		    edXConnection = connectToDatabase(edXDatabase);
+			localConnection = connectToDatabase(localDatabase);
 
-			//3. Get the short user ID instead of the anonymous ID
-			userId = getUserId(edXConnection, anonId);
-			//todo: based on the database structure, this might be changed
-			//todo: check if it is possible to get it from the database - otherwise we need to send HTTP requests directly with the short user id (get it through "analytics" and not through %%USER_ID%%
+			//4. Calculate metrics for the current user
+			individual = new double[6];
+			individual[0] = getAverageTimePerWeek(edXConnection, courseId, userId);
+			individual[1] = getLecturesRevisited(edXConnection, courseId, userId);
+			individual[2] = getForumActivity(edXConnection, courseId, userId);
+			individual[3] = getQuizAttempted(edXConnection, courseId, userId);
+			individual[4] = getProportionTimeOnQuiz(edXConnection, courseId, userId);
+			individual[5] = getTimeliness(edXConnection, courseId, userId);
 
+			//5. Get needed data from the local database: the data series for "frame of reference" and the maximum values for scaling
+			referenceFrameThisWeek = getDataSeriesFromLocalDatabase(localConnection, week, "precalc_2017_social");
+			referenceFrameNextWeek = getDataSeriesFromLocalDatabase(localConnection, week+1, "precalc_2017_social");
+			maximumsThisWeek = getDataSeriesFromLocalDatabase(localConnection, week, "precalc_2017_maximum");
+			maximumsNextWeek = getDataSeriesFromLocalDatabase(localConnection, week+1, "precalc_2017_maximum");
 
-			//4. Calculate metrics for the current user in the requested week
-			int avgTimePerWeek = getAverageTimePerWeek(edXConnection, courseId, userId);
-			int lecturesRevisited = getLecturesRevisited(edXConnection, courseId, userId);
-			int forumActivity = getForumActivity(edXConnection, courseId, userId);
-			int quizAttempted = getQuizAttempted(edXConnection, courseId, userId);
-			int proportionTimeOnQuiz = getProportionTimeOnQuiz(edXConnection, courseId, userId);
-			int timeliness = getTimeliness(edXConnection, courseId, userId);
-
-			//todo: concatenate the values into the "individual" variable to integrate it in the script
-			individual = "";
-
-			//5. Scale the metric values in the range [0-10] so they can be dislayed on the widget
+			//6. Scale the metric values in the range [0-10] so they can be dislayed on the widget
 			// The scaling should be done with the maximum value among the previous graduates (for the social group) and the value
-			//todo
 
-			//todo: concatenate the values into the "individualScaled" variable to integrate it in the script
-
-			//6. Get the "frame of reference" from the local database based on the user ID (division in 4 groups based on the value of user_id modulo 4)
-			// 0 = control group = no widget
-			// 1 = individual = no frame of reference
-			// 2 = social = successful learners
-			// 3 = teacher set goals
-			referenceFrameThisWeek = "";
-			referenceFrameThisWeekScaled = "";
-			referenceFrameNextWeek = "";
-			referenceFrameNextWeekScaled = "";
-			//todo
 
 			//7. Generate the Learning Tracker script
-	   		reply = generateScript(userId, individual, individualScaled, referenceFrameThisWeek, referenceFrameThisWeekScaled, referenceFrameNextWeek, referenceFrameNextWeekScaled);
-			//todo: customize the script based on the treatment group in which the learners are
+	   		reply = generateScript(userId, individual, referenceFrameThisWeek, referenceFrameNextWeek, maximumsThisWeek, maximumsNextWeek);
 
- 			//8. Respond to the request with the generated script
+ 			//8. Respond to the HTTP request with the generated script
            writer.write(reply);
            
            }
@@ -83,6 +71,10 @@ public class PreCalcServlet extends HttpServlet {
 		   ex.getStackTrace();
        } finally {
 			writer.close();  // Always close the output writer
+		   if(edXConnection != null)
+		   		edXConnection.close();
+		   if(localConnection != null)
+		   		localConnection.close();
        }
    }
 
@@ -144,6 +136,7 @@ public class PreCalcServlet extends HttpServlet {
 		}
 		
 		return revisited;
+
 	}
 
 	// Metric 3: ForumActivity: number of contributions to the forum
@@ -167,6 +160,7 @@ public class PreCalcServlet extends HttpServlet {
 		}
 
 		return forum_contribution;
+
 	}
 
 	// Metric 4: QuizAttempted: number of unique quiz questions that were attempted by a learner
@@ -262,6 +256,187 @@ public class PreCalcServlet extends HttpServlet {
 		}
 	}
 
+
+	//===============================
+    //====== Script generation ======
+	//===============================
+
+	// Division of the treatment and control groups
+	// 0 = control group = no widget
+	// 1 = Treatment individual = no frame of reference
+	// 2 = Treatment social = successful learners
+	// 3 = Treatment yardstick = teacher set goals
+
+
+	private String generateScript(String userId, double[] individual, double[] referenceFrameThisWeek, double[] referenceFrameNextWeek, double[] maximumsThisWeek, double[] maximumsNextWeek) {
+
+		String script = "";
+
+		if(Integer.parseInt(userId) % 4 != 0)			// for the control group (userId modulo 4 == 0), do not show the widget
+			script = "$('#wrapper-widget').show();\n";
+
+		script += "\n" +
+				"var metricNames = ['Average time per week',\n" +
+				"'Revisited video-lectures',\n" +
+				"'Forum contributions',\n" +
+				"'Quiz questions attempted ',\n" +
+				"'Proportion of time spent on quiz questions',\n" +
+				"'Timeliness of quiz question submissions'];\n" +
+				"var metricUnits = ['h',\n" +
+				"'',\n" +
+				"'',\n" +
+				"'',\n" +
+				"'%',\n" +
+				"'days'];\n" +
+				"\n" +
+				"var values = " + individual + ";\n" +
+				"var lastWeek = " + composeString(referenceFrameThisWeek) + ";\n" +
+				"var thisWeek = " + composeString(referenceFrameNextWeek) + ";\n" +
+				"\n" +
+				"function getSeriesValue(chart, i) {\n" +
+				"\t\n" +
+				"\tif(chart.points[i].series.name == 'You')\n" +
+				"\t\treturn values[chart.x/60];\n" +
+				"\telse if(chart.points[i].series.name == 'Average graduate last week')\n" +
+				"\t\treturn lastWeek[chart.x/60];\n" +
+				"\telse \n" +
+				"\t\treturn thisWeek[chart.x/60];\n" +
+				"}\n" +
+				"\n" +
+				"function loadWidget() {\n" +
+				"\t\n" +
+				"\t$('#container').highcharts({\n" +
+				"\t\tchart: {\n" +
+				"\t\t\tmarginTop: 120,\n" +
+				"\t\t\tpolar: true,\n" +
+				"\t\t\tstyle: {\n" +
+				"\t\t\t\tfontFamily: 'Open Sans, sans-serif'\n" +
+				"\t\t\t},\n" +
+				"\t\t\ttype: 'area'\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\ttitle: {\n" +
+				"\t\t\ttext: 'Learning tracker',\n" +
+				"\t\t\tstyle: {\n" +
+				"\t\t\t\talign: 'left'\n" +
+				"\t\t\t}\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\tcredits: {\n" +
+				"\t\t\tenabled: false\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\tlegend: {\n" +
+				"\t\t\treversed: true\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\tpane: {\n" +
+				"\t\t\tstartAngle: 0,\n" +
+				"\t\t\tendAngle: 360\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\txAxis: {\n" +
+				"\t\t\ttickInterval: 60,\n" +
+				"\t\t\tmin: 0,\n" +
+				"\t\t\tmax: 360,\n" +
+				"\t\t\tlabels: {\n" +
+				"\t\t\t\tformatter: function () {\n" +
+				"\t\t\t\t\treturn metricNames[this.value/60];\n" +
+				"\t\t\t\t}\n" +
+				"\t\t\t},\n" +
+				"\t\t\tgridLineWidth: 1\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\tyAxis: {\n" +
+				"\t\t\tmin: 0,\n" +
+				"\t\t\tmax: 10,\n" +
+				"\t\t\tgridLineWidth: 1,\n" +
+				"\t\t\tlabels: {\n" +
+				"\t\t\t\tenabled: false\n" +
+				"\t\t\t},\n" +
+				"\t\t\ttickPositions: [0, 5, 10],\n" +
+				"\t\t\tvisible: true\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\tplotOptions: {\n" +
+				"\t\t\tseries: {\n" +
+				"\t\t\t\tallowPointSelect: true,\n" +
+				"\t\t\t\tpointStart: 0,\n" +
+				"\t\t\t\tpointInterval: 60,\n" +
+				"\t\t\t\tcursor: 'pointer',\n" +
+				"\t\t\t\tmarker: {\n" +
+				"\t\t\t\t\tsymbol: 'diamond',\n" +
+				"\t\t\t\t\tradius: 3\n" +
+				"\t\t\t\t}\n" +
+				"\t\t\t},\n" +
+				"\t\t\tcolumn: {\n" +
+				"\t\t\t\tpointPadding: 0,\n" +
+				"\t\t\t\tgroupPadding: 0\n" +
+				"\t\t\t}\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\ttooltip: {\n" +
+				"\t\t\tshared: true,\n" +
+				"\t\t\tformatter: function () {\n" +
+				"\t\t\t\tvar tooltip_text = '<b>' + metricNames[this.x/60] + '</b>';\n" +
+				"\t\t\t\tvar unit = metricUnits[this.x/60];\n" +
+				"\n" +
+				"\t\t\t\tfor (i = this.points.length - 1; i >= 0; i--) { \n" +
+				"\t\t\t\t\ttooltip_text += '<br/>' + this.points[i].series.name + ': <b>' + getSeriesValue(this, i) + ' ' + unit + '</b>';\n" +
+				"\t\t\t\t}\n" +
+				"\n" +
+				"\t\t\t\treturn tooltip_text;\n" +
+				"\t\t\t},\n" +
+				"\t\t},\n" +
+				"\t\t\n" +
+				"\t\tseries: [\t\t\n" +
+
+				getScriptReferenceFrameDataSeries(userId,
+						scaleByMaximum(referenceFrameThisWeek, maximumsThisWeek),
+						scaleByMaximum(referenceFrameNextWeek, maximumsNextWeek)) +
+
+				"\n" +
+				"\t\t{\n" +
+				"\t\t\tname: 'You',\n" +
+				"\t\t\tcolor: 'rgba(144, 202, 249, 0.5)',\n" +
+				"\t\t\tdata: " + composeString(scaleByMaximum(individual, maximumsThisWeek)) + "\n" +
+				"\t\t}]\n" +
+				"\t});\n" +
+				"}\n" +
+				"\t\t\n" +
+				"loadWidget();";
+
+		return script;
+    }
+
+	private String getScriptReferenceFrameDataSeries(String userId, double[] referenceFrameThisWeekScaled, double[] referenceFrameNextWeekScaled) {
+		String legendReferenceFrame = "";
+
+		//customize the name in the legend based on the treatment group
+		if(Integer.parseInt(userId) % 4 == 2)
+			legendReferenceFrame = "Average graduate";
+
+		if(Integer.parseInt(userId) % 4 == 3)
+			legendReferenceFrame = "Teacher recommendation for";
+
+		return "\t\t{\n" +
+				"\t\t\ttype: 'line',\n" +
+				"\t\t\tname: '" + legendReferenceFrame + " next week',\n" +
+				"\t\t\tcolor: 'rgba(188, 64, 119, 0.5)',\n" +
+				"\t\t\tdata: " + composeString(referenceFrameNextWeekScaled) + ",\n" +
+				"\t\t\tvisible: false\n" +
+				"\t\t},\n" +
+				"\n" +
+				"\t\t{\n" +
+				"\t\t\tname: '" + legendReferenceFrame + " this week',\n" +
+				"\t\t\tcolor: 'rgba(255, 255, 102, 0.5)',\n" +
+				"\t\t\tdata: " + composeString(referenceFrameThisWeekScaled) + "\n" +
+				"\n" +
+				"\t\t},\n";
+	}
+
+
+
 	//===============================
 	//====== Auxiliary methods ======
 	//===============================
@@ -274,225 +449,46 @@ public class PreCalcServlet extends HttpServlet {
 		return connection;
 	}
 
-	private String getUserId(Connection conn, String anonId) throws SQLException {		// todo: might not be needed, depending on the database structure and the values of the course_user_id fields
-		//based on the anonymous user id available on the edX pages, connect to the short user id that is used in the trace logs
-		String query = "SELECT * FROM learners WHERE anon_id='" + anonId + "';";
-		String userId = "";
+	private double[] getDataSeriesFromLocalDatabase(Connection localConnection, int week, String table) throws SQLException{
+		double[] profile = new double[6];
 
-		Statement st = conn.createStatement();
+
+		if(week >= course_weeks)	//during the last week of the course, the "next_week" data is the same as the last week
+			week = course_weeks;
+
+
+		String query = "SELECT * FROM " + table + " WHERE week='" + week + "';";
+
+		Statement st = localConnection.createStatement();
 		ResultSet res = st.executeQuery(query);
 
 		if (res.next()) {
-			userId = res.getString("user_id");
+			for (int i = 1; i <= 6; i++)
+				profile[i - 1] = res.getInt("metric_" + i);
 		}
 
-		return userId;
+
+		return profile;
 	}
 
-	//===============================
-    //====== Script generation ======
-	//===============================
+	private String composeString(double[] values) {
+		String result = "[";
 
-   private String generateScript(String user_id, String values, String scaled_values, String last_week, String scaled_last_week, String this_week, String scaled_this_week) {
+		for(int i = 0; i < values.length - 1; i++)
+			result += values[i] + ", ";
+		result += values[values.length-1] + "]";
 
-		String reply = "";
+		return result;
+	}
 
-		if(Integer.parseInt(user_id) % 4 != 0)			// for the control group (userId modulo 4 == 0), do not show the widget
-					reply = "$('#wrapper-widget').show();\n";
+	private double[] scaleByMaximum(double [] dataSeries, double [] maximum) {
+		//scales the dataSeries on a scale from 0 to 10, where 10 is the corresponding value in the maximum series
+		double[] scaledValues = new double[6];
+		for (int i = 0; i < 6; i++)
+			scaledValues[i] = Math.floor(dataSeries[i]/maximum[i] * 10 * 100) / 100;
 
-		reply += "\n" +
-					"var metricNames = ['Average time per week',\n" +
-					"'Revisited video-lectures',\n" +
-					"'Forum contributions',\n" +
-					"'Quiz questions attempted ',\n" +
-					"'Proportion of time spent on quiz questions',\n" +
-					"'Timeliness of quiz question submissions'];\n" +
-					"var metricUnits = ['h',\n" +
-					"'',\n" +
-					"'',\n" +
-					"'',\n" +
-					"'%',\n" +
-					"'days'];\n" +
-					"\n" +
-					"var values = " + values + ";\n" +
-					"var lastWeek = " + last_week + ";\n" +
-					"var thisWeek = " + this_week + ";\n" +
-					"\n" +
-					"function getSeriesValue(chart, i) {\n" +
-					"\t\n" +
-					"\tif(chart.points[i].series.name == 'You')\n" +
-					"\t\treturn values[chart.x/60];\n" +
-					"\telse if(chart.points[i].series.name == 'Average graduate last week')\n" +
-					"\t\treturn lastWeek[chart.x/60];\n" +
-					"\telse \n" +
-					"\t\treturn thisWeek[chart.x/60];\n" +
-					"}\n" +
-					"\n" +
-					"function timeStamp() {\n" +
-					"  var now = new Date();\n" +
-					"  var date = [ now.getFullYear(), now.getMonth() + 1, now.getDate() ];\n" +
-					"  var time = [ now.getHours(), now.getMinutes(), now.getSeconds() ];\n" +
-					"\n" +
-					"  for ( var i = 1; i < 3; i++ ) {\n" +
-					"    if ( time[i] < 10 ) {\n" +
-					"      time[i] = \"0\" + time[i];\n" +
-					"    }\n" +
-					"  }\n" +
-					"\n" +
-					"  if( date[1] < 10 ) {\n" +
-					"\tdate[1] = \"0\" + date[1];\n" +
-					"  }\n" +
-					"  \n" +
-					"  return date.join(\"-\") + \"Z\" + time.join(\":\");\n" +
-					"}\n" +
-					"\n" +
-					"function loadWidget() {\n" +
-					"\t\n" +
-					"\tvar user_id = '" + user_id + "';\n" +
-					"\t\n" +
-					"\t$('#container').highcharts({\n" +
-					"\t\tchart: {\n" +
-					"\t\t\tmarginTop: 120,\n" +
-					"\t\t\tpolar: true,\n" +
-					"\t\t\tstyle: {\n" +
-					"\t\t\t\tfontFamily: 'Open Sans, sans-serif'\n" +
-					"\t\t\t},\n" +
-					"\t\t\ttype: 'area',\n" +
-					"\t\t\tevents: {\n" +
-					"\t\t\t\tload: function () {\n" +
-					"\t\t\t\t\tvar category = user_id + '_week" + week + "';\n" +
-					"\t\t\t\t\tgaPC('send', 'event', category, 'load_' + timeStamp());\n" +
-					"\t\t\t\t}\n" +
-					"\t\t\t}\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\ttitle: {\n" +
-					"\t\t\ttext: 'Learning tracker',\n" +
-					"\t\t\tstyle: {\n" +
-					"\t\t\t\talign: 'left'\n" +
-					"\t\t\t}\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\tcredits: {\n" +
-					"\t\t\tenabled: false\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\tlegend: {\n" +
-					"\t\t\treversed: true\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\tpane: {\n" +
-					"\t\t\tstartAngle: 0,\n" +
-					"\t\t\tendAngle: 360\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\txAxis: {\n" +
-					"\t\t\ttickInterval: 60,\n" +
-					"\t\t\tmin: 0,\n" +
-					"\t\t\tmax: 360,\n" +
-					"\t\t\tlabels: {\n" +
-					"\t\t\t\tformatter: function () {\n" +
-					"\t\t\t\t\treturn metricNames[this.value/60];\n" +
-					"\t\t\t\t}\n" +
-					"\t\t\t},\n" +
-					"\t\t\tgridLineWidth: 1\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\tyAxis: {\n" +
-					"\t\t\tmin: 0,\n" +
-					"\t\t\tmax: 10,\n" +
-					"\t\t\tgridLineWidth: 1,\n" +
-					"\t\t\tlabels: {\n" +
-					"\t\t\t\tenabled: false\n" +
-					"\t\t\t},\n" +
-					"\t\t\ttickPositions: [0, 5, 10],\n" +
-					"\t\t\tvisible: true\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\tplotOptions: {\n" +
-					"\t\t\tseries: {\n" +
-					"\t\t\t\tallowPointSelect: true,\n" +
-					"\t\t\t\tpointStart: 0,\n" +
-					"\t\t\t\tpointInterval: 60,\n" +
-					"\t\t\t\tcursor: 'pointer',\n" +
-					"\t\t\t\tmarker: {\n" +
-					"\t\t\t\t\tsymbol: 'diamond',\n" +
-					"\t\t\t\t\tradius: 3\n" +
-					"\t\t\t\t}\n" +
-					"\t\t\t},\n" +
-					"\t\t\tcolumn: {\n" +
-					"\t\t\t\tpointPadding: 0,\n" +
-					"\t\t\t\tgroupPadding: 0\n" +
-					"\t\t\t}\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\ttooltip: {\n" +
-					"\t\t\tshared: true,\n" +
-					"\t\t\tformatter: function () {\n" +
-					"\t\t\t\tvar tooltip_text = '<b>' + metricNames[this.x/60] + '</b>';\n" +
-					"\t\t\t\tvar unit = metricUnits[this.x/60];\n" +
-					"\n" +
-					"\t\t\t\tfor (i = this.points.length - 1; i >= 0; i--) { \n" +
-					"\t\t\t\t\ttooltip_text += '<br/>' + this.points[i].series.name + ': <b>' + getSeriesValue(this, i) + ' ' + unit + '</b>';\n" +
-					"\t\t\t\t}\n" +
-					"\n" +
-					"\t\t\t\treturn tooltip_text;\n" +
-					"\t\t\t},\n" +
-					"\t\t},\n" +
-					"\t\t\n" +
-					"\t\tseries: [\t\t\n" +
-					"\t\t{\n" +
-					"\t\t\ttype: 'line',\n" +
-					"\t\t\tname: 'Average graduate this week',\n" +
-					"\t\t\tcolor: 'rgba(188, 64, 119, 0.5)',\n" +
-					"\t\t\tdata: " + scaled_this_week + ",\n" +
-					"\t\t\tvisible: false,\n" +
-					"\t\t\tevents: {\n" +
-					"\t\t\t\tshow: function () {\n" +
-					"\t\t\t\t\tgaPC('send', 'event', user_id + '_week" + week + "', 'show-this-week_' + timeStamp());\n" +
-					"\t\t\t\t},\n" +
-					"\t\t\t\thide: function () {\n" +
-					"\t\t\t\t\tgaPC('send', 'event', user_id + '_week" + week + "', 'hide-this-week_' + timeStamp());\n" +
-					"\t\t\t\t}\n" +
-					"\t\t\t}\n" +
-					"\t\t},\n" +
-					"\n" +
-					"\t\t{\n" +
-					"\t\t\tname: 'Average graduate last week',\n" +
-					"\t\t\tcolor: 'rgba(255, 255, 102, 0.5)',\n" +
-					"\t\t\tdata: " + scaled_last_week + ",\n" +
-					"\n" +
-					"\t\t\tevents: {\n" +
-					"\t\t\t\tshow: function () {\n" +
-					"\t\t\t\t\tgaPC('send', 'event', user_id + '_week" + week + "', 'show-last-week_' + timeStamp());\n" +
-					"\t\t\t\t},\n" +
-					"\t\t\t\thide: function () {\n" +
-					"\t\t\t\t\tgaPC('send', 'event', user_id + '_week" + week + "', 'hide-last-week_' + timeStamp());\n" +
-					"\t\t\t\t}\n" +
-					"\t\t\t}\n" +
-					"\n" +
-					"\t\t},\n" +
-					"\n" +
-			"\t\t{\n" +
-					"\t\t\tname: 'You',\n" +
-					"\t\t\tcolor: 'rgba(144, 202, 249, 0.5)',\n" +
-					"\t\t\tdata: " + scaled_values + ",\n" +
-					"\t\t\tevents: {\n" +
-					"\t\t\t\tshow: function () {\n" +
-					"\t\t\t\t\tgaPC('send', 'event', user_id + '_week" + week + "', 'show-you_' + timeStamp());\n" +
-					"\t\t\t\t},\n" +
-					"\t\t\t\thide: function () {\n" +
-					"\t\t\t\t\tgaPC('send', 'event', user_id + '_week" + week + "', 'hide-you_' + timeStamp());\n" +
-					"\t\t\t\t}\n" +
-					"\t\t\t}\n" +
-					"\t\t}]\n" +
-					"\t});\n" +
-					"}\n" +
-					"\t\t\n" +
-					"loadWidget();";
-
-			return reply;
-    }
+		return scaledValues;
+	}
 
 	private class DatabaseData {
 		private String dbURL;
