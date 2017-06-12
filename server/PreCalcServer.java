@@ -78,7 +78,6 @@ public class PreCalcServlet extends HttpServlet {
        }
    }
 
-
 	//=========================================
 	//====== Metric computation methods =======
 	//=========================================
@@ -110,46 +109,151 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 2: LecturesRevisited: number of videos that have been visited more than once and viewed more than 80% of their total duration
 	// Unit: -
 	// Calculation:
-	// Tables used:
+   //  Tables used: "video_interaction" & "video_additional". By which the "video_interaction" used fields are:
+   //		"course_run_id" - to identify the course
+   // 		"learner_id" - to identify the current user
+   // 		"video_id" - to identify the video
+   //		"duration" - to examine if a user wathces more than or equal 80% of the total video duration
+   //	*and the "video_additional" table used fields are:
+   // 		"video_id" - to identify the video
+   // 		"length" - to calcualte if a user watches more than 80%
+	
+	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) throws SQLException{
+		String query ="SELECT A.video_id, COUNT(I.video_id) AS video_count "
+				+ "FROM edXDatabase.video_interaction I"
+				+ " INNER JOIN localDatabase.video_additional A ON A.video_id = I.video_id"
+				+ " AND I.duration / A.length >= 0.80"
+				+ " WHERE I.course_run_id='" + courseId + "' AND I.learner_id='" + userId +  "'"
+				+ "GROUP BY A.video_id HAVING COUNT(I.video_id) >= 2";		// the query connects two databases. //todo: check if it runs correctly.
+						
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		int revisited = 0;
+		
+		if (rs.next()){
+			revisited = rs.getInt("video_count");
+		}
+		
+		return revisited;
 
-	private int getLecturesRevisited(Connection edXConnection, String courseId, String userId) throws SQLException {
-		return 0;
 	}
 
 	// Metric 3: ForumActivity: number of contributions to the forum
 	// Unit: -
-	// Calculation:
-	// Tables used:
+	// Calculation: summing up forum contribution based on each user's posts 
+	// Tables used: "forum_interaction" with the fields:
+    //		"course_run_id" - to identify the course
+    // 		"learner_id" - to identify the current user
+    // 		"post_id" - to calculate the number of user's forum posts
 
-	private int getForumActivity(Connection edXConnection, String courseId, String userId) throws SQLException {
-		return 0;
+	private int getForumActivity(Connection edXConnection, String courseId, String userId) throws SQLException{
+		String query = "SELECT COUNT(post_id) AS post_count FROM forum_interaction WHERE course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
+				
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		int forum_contribution = 0;
+		
+		if (rs.next()){
+			forum_contribution = rs.getInt("post_count");
+		}
+
+		return forum_contribution;
+
 	}
 
 	// Metric 4: QuizAttempted: number of unique quiz questions that were attempted by a learner
 	// Unit: -
-	// Calculation:
-	// Tables used:
+	// Calculation: summing the number of unique quiz attempts by a learner 
+	// Tables used: "submissions" with the fields of:
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify the current user
+	// 		"question_id" - to calculate the number of user's quiz attempts
 
-	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) {
-		return 0;
+	private int getQuizAttempted(Connection edXConnection, String courseId, String userId) throws SQLException {
+		String query = "SELECT COUNT(DISTINCT question_id) AS quiz_count FROM submissions "
+					+ "WHERE learner_id='" + userId + "' AND course_run_id='" + courseId + "';"; 
+		
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		int quiz_attempts = 0;
+		
+		if (rs.next())
+			quiz_attempts += rs.getInt("quiz_count");
+				
+		return quiz_attempts;
 	}
 
 	// Metric 5: ProportionTimeOnQuiz: the proportion of time spent on quiz pages from the total time spent on the platform
 	// Unit: -
 	// Calculation:
-	// Tables used:
+	// Tables used: "sessions" & "quiz_sessions". By which the "sessions" used fields are:
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify sessions belonging to the current user
+	// 		"duration" - to calculate the general time spent on platform
+	//		*and the "quiz_sessions" table used fields are:
+	//		"duration" - to calculate the time spent on quiz
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify the current user
+	
+	private int getProportionTimeOnQuiz(Connection edXConnection, String courseId, String userId) throws SQLException {
+		   String query_duration = "SELECT SUM(duration) AS total_time_duration FROM sessions WHERE course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
+		   String query_time_on_quiz = "SELECT SUM(duration) AS quiz_duration FROM quiz_sessions Where course_run_id='" + courseId + "' AND learner_id='" + userId + "';";
+		   		   
+		   Statement stmt = edXConnection.createStatement();
+		   ResultSet rs;
+		   
+		   rs = stmt.executeQuery(query_duration);
 
-	private int getProportionTimeOnQuiz(Connection edXConnection, String courseId, String userId) {
-		return 0;
+		   int total_duration = 0;	//this fields is in seconds in the database
+		  		   
+		   if (rs.next())
+			   total_duration = rs.getInt("total_time_duration");
+		   		   
+		   rs = stmt.executeQuery(query_time_on_quiz);
+		   
+		   int quiz_duration = 0;  //in seconds
+		   
+		   if (rs.next())
+			   quiz_duration = rs.getInt("quiz_duration");
+		   
+		   return quiz_duration * 100 / total_duration;
 	}
 
 	// Metric 6: Timeliness: how early before the deadline learners submit their quiz question answers
 	// Unit: hours
 	// Calculation:
-	// Tables used:
-
-	private int getTimeliness(Connection edXConnection, String courseId, String userId) {
-		return 0;
+	// Tables used: "submissions" & ""quiz_questions". By which the "submission" used fields are:
+	//		"course_run_id" - to identify the course
+	// 		"learner_id" - to identify the current user
+	//		"question_id" - to identify the current question
+	//		"submission_timestamp" - to identify the user's quiz submission date 
+	//		*and the "quiz_questions" table used fields are:
+	//		"question_due" - to identify the quiz question due date
+	//		"question_id" - to identify the current question
+	
+	private int getTimeliness(Connection edXConnection, String courseId, String userId) throws SQLException{
+		String query = "SELECT COUNT(*) AS countLines"
+				+ ", AVG(TIME_TO_SEC(TIMEDIFF(submissions.submission_timestamp, quiz_questions.question_due)) / 3600) AS timeliness_average"
+				+ " FROM submissions"
+				+ " INNER JOIN"
+				+ " quiz_questions ON submissions.question_id = quiz_questions.question_id where"
+				+ "submission.learner_id = '" + userId + "' AND submissions.course_run_id= '" + courseId + "';";
+	
+		Statement stmt = edXConnection.createStatement();
+		ResultSet rs = stmt.executeQuery(query);
+		
+		double timeliness_average = 0;  //in hours
+		 
+		if (rs.next()) {
+			timeliness_average += rs.getInt("timeliness_average");
+			return timeliness_average;
+		} while(rs.next());
+		else
+			return 0;		// in case rs == null
+		}
 	}
 
 
