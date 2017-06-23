@@ -1,11 +1,11 @@
 # Database Changes from edX to Vis_Server schema
 
 ### Major changes:
-- Removed course_run_id from functions since this course_run_id does not exist in the new database.
-- Changed learner_id to course_learner_id 
-- Changed submissions.submission_timestamp to submissions.sumission_timestamp
-- Table change from course_run to courses
-- Removed the course_run_id column from video_additional in the local database of idxmooc server
+- Removed _course_run_id_ from functions since the _course_run_id_ does not exist in the new database.
+- Changed _learner_id_ to _course_learner_id_ 
+- Changed _submissions.submission_timestamp_ to _submissions.sumission_timestamp_
+- Table change from _course_run_ to _courses_
+- Removed the _course_run_id_ column from _video_additional_ table in the local database of idxmooc server
 
 ### Affected Function:
 * getAverageTimePerWeek
