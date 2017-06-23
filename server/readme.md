@@ -1,4 +1,4 @@
-# Database Changes from edX to Vis_Server
+# Database Changes from edX to Vis_Server schema
 
 ### Major changes:
 - Removed course_run_id from functions since this course_run_id does not exist in the new database.
