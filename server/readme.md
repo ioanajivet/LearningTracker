@@ -8,10 +8,10 @@
 - Removed the course_run_id column from video_additional in the local database of idxmooc server
 
 ### Affected Function:
-getAverageTimePerWeek
-getLecturesRevisited
-getForumActivity
-getQuizAttempted
+* getAverageTimePerWeek
+* getLecturesRevisited
+* getForumActivity
+* getQuizAttempted
 getProportionTimeOnQuiz
 getTimeliness
 getCourseWeeks
