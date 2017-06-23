@@ -12,16 +12,16 @@
 * getLecturesRevisited
 * getForumActivity
 * getQuizAttempted
-getProportionTimeOnQuiz
-getTimeliness
-getCourseWeeks
-getCourseStartDate
-getCourseEndDate
-getTimeOnPlatform
-getForumContributions
-getQuizAttempted
-getTimeOnQuiz
-getTimeliness
-getWatchedVideosWithDuration
-getWatchedVideosCount
-getVideosLengths
+* getProportionTimeOnQuiz
+* getTimeliness
+* getCourseWeeks
+* getCourseStartDate
+* getCourseEndDate
+* getTimeOnPlatform
+* getForumContributions
+* getQuizAttempted
+* getTimeOnQuiz
+* getTimeliness
+* getWatchedVideosWithDuration
+* getWatchedVideosCount
+* getVideosLengths
