@@ -1,3 +1,4 @@
+package precalc_2017;
 
 class DatabaseData {
 		protected String dbURL;

@@ -1,3 +1,5 @@
+package precalc_2017;
+
 import java.sql.*;
 import java.util.HashMap;
 import java.util.Map;
