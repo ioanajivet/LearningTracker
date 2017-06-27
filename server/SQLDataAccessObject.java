@@ -172,7 +172,7 @@ public class SQLDataAccessObject {
 
     public int getTimeliness(String userId) throws SQLException {
         String query = "SELECT COUNT(*) AS countLines"
-                + ", AVG(TIME_TO_SEC(TIMEDIFF(submissions.sumission_timestamp, quiz_questions.question_due)) / 3600) AS timeliness_average"
+                + ", AVG(TIME_TO_SEC(TIMEDIFF(submissions.sumbission_timestamp, quiz_questions.question_due)) / 3600) AS timeliness_average"
                 + " FROM submissions"
                 + " INNER JOIN"
                 + " quiz_questions ON submissions.question_id = quiz_questions.question_id WHERE "
