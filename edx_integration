@@ -11,7 +11,7 @@
 
             ['https://code.highcharts.com/highcharts.js',
              'https://code.highcharts.com/highcharts-more.js',
-             'https://idxmooc.ewi.tudelft.nl/precalc/getScript?userId=' + userId
+             'https://idxmooc.ewi.tudelft.nl/precalc/getData?userId=' + userId
              ].forEach(function(src) {
                      var elem = document.getElementsByTagName('footer')[0];
                      var script = document.createElement('script');
