@@ -13,7 +13,7 @@ import java.util.concurrent.TimeUnit;
 public class PreCalcServlet extends HttpServlet {
 
 	private static final int COURSE_WEEKS = 14;					//TODO: UPDATE
-	private static final String COURSE_RUN_ID = "43";			//todo: update the course_run_id. Should it remain hardcoded for this case?
+	//private static final String COURSE_RUN_ID = "43";			//todo: update the course_run_id. Should it remain hardcoded for this case?
 	private static final String REFERENCE_FRAME_TABLE = "precalc_2017_social";
 	private static final String MAXIMUM_TABLE = "precalc_2017_maximum";
 
@@ -50,16 +50,16 @@ public class PreCalcServlet extends HttpServlet {
 		   //course_weeks = getCourseWeeks(edXConnection, COURSE_RUN_ID);
 
 		   //4. Calculate the current week - needed for calculating averages per week and retrieving the reference frames
-		   week = getCurrentWeek(edXConnection, timestamp, COURSE_RUN_ID);
+		   week = getCurrentWeek(edXConnection, timestamp);
 
 		   //5. Calculate metrics for the current user
 		   individual = new double[6];
-		   individual[0] = getAverageTimePerWeek(edXConnection, COURSE_RUN_ID, userId, week);
-		   individual[1] = getLecturesRevisited(edXConnection, localConnection, COURSE_RUN_ID, userId);
-		   individual[2] = getForumActivity(edXConnection, COURSE_RUN_ID, userId);
-		   individual[3] = getQuizAttempted(edXConnection, COURSE_RUN_ID, userId);
-		   individual[4] = getProportionTimeOnQuiz(edXConnection, COURSE_RUN_ID, userId);
-		   individual[5] = getTimeliness(edXConnection, COURSE_RUN_ID, userId);
+		   individual[0] = getAverageTimePerWeek(edXConnection, userId, week);
+		   individual[1] = getLecturesRevisited(edXConnection, localConnection, userId);
+		   individual[2] = getForumActivity(edXConnection, userId);
+		   individual[3] = getQuizAttempted(edXConnection, userId);
+		   individual[4] = getProportionTimeOnQuiz(edXConnection, userId);
+		   individual[5] = getTimeliness(edXConnection, userId);
 
 		   //6. Get needed data from the local database: the data series for "frame of reference" and the maximum values for scaling
 		   referenceFrameThisWeek = getDataSeriesFromLocalDatabase(localConnection, week, REFERENCE_FRAME_TABLE);
@@ -92,8 +92,8 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 1: AverageTimePerWeek: average time spent on the platform each week
 	// Unit: minutes
 
-   private int getAverageTimePerWeek(SQLDataAccessObject database, String courseRunId, String userId, int week) throws SQLException {
-	   int timeOnPlatform = database.getTimeOnPlatform(courseRunId, userId);
+   private int getAverageTimePerWeek(SQLDataAccessObject database, String userId, int week) throws SQLException {
+	   int timeOnPlatform = database.getTimeOnPlatform(userId);
 
 	   return timeOnPlatform/60/week; 		//convert the value from seconds to minutes
 
@@ -102,10 +102,10 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 2: LecturesRevisited: number of videos that have been visited more than once and viewed more than 80% of their total duration
 	// Unit: -
 
-	private int getLecturesRevisited(SQLDataAccessObject edXDatabase, SQLDataAccessObject localDatabase, String courseId, String userId) throws SQLException{
-		Map<String, Integer> watchedVideosCount = edXDatabase.getWatchedVideosCount(courseId, userId);
-		Map<String, Integer> watchedVideosLength = edXDatabase.getWatchedVideosWithDuration(courseId, userId);
-		Map<String, Integer> videosLength = localDatabase.getVideosLengths(courseId);
+	private int getLecturesRevisited(SQLDataAccessObject edXDatabase, SQLDataAccessObject localDatabase, String userId) throws SQLException{
+		Map<String, Integer> watchedVideosCount = edXDatabase.getWatchedVideosCount(userId);
+		Map<String, Integer> watchedVideosLength = edXDatabase.getWatchedVideosWithDuration(userId);
+		Map<String, Integer> videosLength = localDatabase.getVideosLengths();
 
 		return (int) watchedVideosCount.entrySet().stream()
 				.filter(e -> e.getValue() > 1)
@@ -117,25 +117,25 @@ public class PreCalcServlet extends HttpServlet {
 	// Metric 3: ForumActivity: number of contributions to the forum
 	// Unit: -
 
-	private int getForumActivity(SQLDataAccessObject database, String courseId, String userId) throws SQLException{
+	private int getForumActivity(SQLDataAccessObject database, String userId) throws SQLException{
 
-		return database.getForumContributions(courseId, userId);
+		return database.getForumContributions(userId);
 	}
 
 	// Metric 4: QuizAttempted: number of unique quiz questions that were attempted by a learner
 	// Unit: -
 
-	private int getQuizAttempted(SQLDataAccessObject database, String courseId, String userId) throws SQLException {
+	private int getQuizAttempted(SQLDataAccessObject database, String userId) throws SQLException {
 
-		return database.getQuizAttempted(courseId, userId);
+		return database.getQuizAttempted(userId);
 	}
 
 	// Metric 5: ProportionTimeOnQuiz: the proportion of time spent on quiz pages from the total time spent on the platform
 	// Unit: -
 	
-	private int getProportionTimeOnQuiz(SQLDataAccessObject database, String courseId, String userId) throws SQLException {
-		int total_duration = database.getTimeOnPlatform(courseId, userId);
-		int quiz_duration = database.getTimeOnQuiz(courseId, userId);
+	private int getProportionTimeOnQuiz(SQLDataAccessObject database, String userId) throws SQLException {
+		int total_duration = database.getTimeOnPlatform(userId);
+		int quiz_duration = database.getTimeOnQuiz(userId);
 
 		if(total_duration == 0)
 			return 0;
@@ -145,8 +145,8 @@ public class PreCalcServlet extends HttpServlet {
 
 	// Metric 6: Timeliness: how early before the deadline learners submit their quiz question answers
 	// Unit: hours
-	private int getTimeliness(SQLDataAccessObject database, String courseId, String userId) throws SQLException{
-		return database.getTimeliness(courseId, userId);
+	private int getTimeliness(SQLDataAccessObject database, String userId) throws SQLException{
+		return database.getTimeliness(userId);
 	}
 
 
@@ -187,8 +187,8 @@ public class PreCalcServlet extends HttpServlet {
 		return timeUnit.convert(diffInMillies,TimeUnit.MILLISECONDS);
 	}
 
-	private int getCurrentWeek(SQLDataAccessObject database, Date timestamp, String courseRunId) throws SQLException, ParseException {
-		Date startDate = parseStringToDate(database.getCourseStartDate(courseRunId));
+	private int getCurrentWeek(SQLDataAccessObject database, Date timestamp) throws SQLException, ParseException {
+		Date startDate = parseStringToDate(database.getCourseStartDate());
 		return (int) getDateDiff(startDate, timestamp, TimeUnit.DAYS) / 7;
 	}
 
@@ -198,9 +198,9 @@ public class PreCalcServlet extends HttpServlet {
 		return format.parse(dateString);
 	}
 
-	private int getCourseWeeks(SQLDataAccessObject database, String courseRunId) throws SQLException, ParseException {
-		Date startDate = parseStringToDate(database.getCourseStartDate(courseRunId));
-		Date endDate = parseStringToDate(database.getCourseEndDate(courseRunId));
+	private int getCourseWeeks(SQLDataAccessObject database) throws SQLException, ParseException {
+		Date startDate = parseStringToDate(database.getCourseStartDate());
+		Date endDate = parseStringToDate(database.getCourseEndDate());
 		return (int) getDateDiff(startDate, endDate, TimeUnit.DAYS) / 7;
 	}
 
