@@ -1,0 +1,46 @@
+
+
+<div style="clear: left">
+<img style="float: left" src="/static/memory.jpg" alt="Memory" height="250px">
+
+<div class="cont-intro" style="display: none">
+<h2>Being a Self-Aware Learner</h2>	
+</div>
+
+<div class="indiv-intro" style="display: none">
+<h2>Being a Self-Aware Learner</h2>	
+</div>
+
+<div class="social-intro" style="display: none">
+<h2>Being a Socially-Aware Learner</h2>	
+</div>
+
+<div class="instruct-intro" style="display: none">
+<h2>Being a Self-Aware Student</h2>	
+</div>
+
+
+
+<p>Image Credit: http://www.publicdomainpictures.net/</p>
+
+
+</div>
+
+<script>
+	var userid;
+
+	setTimeout(textGen(), 5000)
+
+	function textGen() {
+		userid = analytics.user()._getId();
+		if (userid % 4 == 0) {
+	      $( ".cont-intro" ).css('display', 'block');
+	  } else if (userid % 4 == 1) {
+	  	$( ".indiv-intro" ).css('display', 'block');
+	  } else if (userid % 4 == 2) {
+	  	$( ".social-intro" ).css('display', 'block');
+	  } else if (userid % 4 == 3) {
+	  	$( ".instruct-intro" ).css('display', 'block');
+  	  }
+    }  
+</script>
