@@ -1,0 +1,148 @@
+<!-- Widget scripts -->
+
+<style>
+
+#helpText {
+  display: flex;
+  justify-content: space-around;
+}
+
+.left {
+  margin: 20px;
+  width: 400px;
+}
+
+.right {
+  margin: 20px;
+  width: 400px;
+}
+
+</style>
+
+<link href='https://fonts.googleapis.com/css?family=Open+Sans' rel='stylesheet' type='text/css'>
+<script>
+
+    function timeStamp() {
+      var now = new Date();
+      var date = [ now.getFullYear(), now.getMonth() + 1, now.getDate() ];
+
+      if( date[1] < 10 ) {
+        date[1] = "0" + date[1];
+      }
+
+      return date.join("-");
+    }
+
+  $(window).load(function() {
+
+        analytics.ready(function() {
+          
+          var userId = analytics.user().id();
+          $( ".highcharts-title").css("display", "none");
+          
+            ['https://code.highcharts.com/highcharts.js',
+             'https://code.highcharts.com/highcharts-more.js',
+             'https://idxmooc.ewi.tudelft.nl/precalc/getData?userId=' + userId + '&currentDate=' + timeStamp()
+             ].forEach(function(src) {
+                     var elem = document.getElementsByTagName('footer')[0];
+                     var script = document.createElement('script');
+                     script.src = src;
+                     script.async = false;
+                     elem.appendChild(script);
+                     $( ".highcharts-title").css("display", "none");
+                    });
+             $( ".highcharts-title").css("display", "none");
+         });
+  });
+
+</script>
+
+<!-- Content -->
+<div id="wrapper-widget" style="display: none;">
+<!--The text and divs before the Learning Tracker should be HERE-->
+  
+<h1>Learning Tracker</h1>
+
+<p>
+  In order to help you become more aware of your habits as a learner, we have created the <b>Learning Tracker</b>. Each week, the information presented in the chart below will be updated to reflect your behavior in the course.
+</p>
+
+
+<p id="indiv-LT" style="display: none">
+  The <b>Learning Tracker</b> allows you to become more aware of your own behavior patterns as a learner. By having a better self-awareness and frequently reflecting on your learning behavior, you will increase your chances of reaching your goals and passing the course!
+</p>
+
+<p id="social-LT" style="display: none">
+  The <b>Learning Tracker</b> allows you to compare your behavior to that of your most successful peers---those who have earned a passing grade in the course before. If you try your best to match your behavior to theirs, you will increase your chances of reaching your goals and passing the course!
+</p>
+
+<p id="instruct-LT" style="display: none">
+  The <b>Learning Tracker</b> allows you to compare your behavior to the instructor's recommendations. By trying your best to match your behavior to how the instructor thinks you should take the course each week, you will increase your chances of reaching your goals and passing the course!
+</p>
+  
+<!-- Do not remove the "container" div -->  
+<div id="container" style="width: 600px; height: 500px; margin: 0 auto;"></div>
+
+
+
+<div id="helpText">
+
+<h2>Key:</h2>
+
+<div class="left">
+<h4>Average Time per Week</h4>
+<p>The average amount of time each week (in hours) that you spend in the Pre-University Calculus course.</p>
+
+<h4>Revisited Video Lectures</h4>
+<p>The number of video lectures that you have watched more than one time. Revisiting video lectures is effective in improving your memory.</p>
+
+<h4>Forum Contributions</h4>
+<p>The number of times you have contributed to the course discussion forum.</p>
+
+</div>
+
+<div class="right">
+
+<h4>Quiz Questions Attempted</h4>
+<p>The amount of quiz questions you have submitted a response to.</p>
+
+<h4>Proportion of Time Spent on Quiz Questions</h4>
+<p>How much time you spend answering quiz question comapred to other course activities.</p>
+
+<h4>Timeliness of Quiz Question Submissions</h4>
+<p>The amount of time (in days) ahead of the deadline you tend to submit quiz questions. The highher this value is, the better, as it shows that you're not procrastinating.</p>
+</div>
+
+</div>
+
+</div>
+
+<script>
+
+var titleRemove = setInterval(function(){ if ($( ".highcharts-title").css("display") === "block") {
+  $( ".highcharts-title").css("display", "none");
+} else if ($( ".highcharts-title").css("display") === "none") {
+    stopFunction();
+  }
+}, 100);
+
+function stopFunction() {
+  clearInterval(titleRemove);
+}
+
+
+
+setTimeout(textGen(), 5000)
+
+function textGen() {
+  var userid = analytics.user()._getId();
+  if (userid % 4 == 0) {
+  } else if (userid % 4 == 1) {
+    $( "#indiv-LT" ).css('display', 'block');
+  } else if (userid % 4 == 2) {
+    $( "#social-LT" ).css('display', 'block');
+  } else if (userid % 4 == 3) {
+    $( "#instruct-LT" ).css('display', 'block');
+    }
+  }  
+</script>
