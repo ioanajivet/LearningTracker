@@ -25,8 +25,6 @@ The server backend serves two purposes:
 **Storing learner data**
 The data is stored in a mySQL database and updated weekly. 
 
-_TODO:_ database diagram 
-
 **Generating widget scripts**
 The server also accepts HTTPS requests from the edX pages that request the script of a specific learnerss. The request has two parameters: _learner's anonymous id_ and _the week_. The server backend is implemented as a Tomcat servlet that receives HTTPS requests and responds with the generated Learning Tracker script as a string. 
 
