@@ -1,8 +1,5 @@
 # Learning Tracker
 
-## Introduction
-TODO
-
 ## Functional architecture
 
 The working architecture of the Learning Tracker has three components as shown in the figure below.
